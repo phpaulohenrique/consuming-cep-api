@@ -1,45 +1,56 @@
 import 'dart:async';
 import 'dart:convert';
-
+import 'dart:js_interop';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-Future<Address> fetchAddress(int cep) async {
+Future<Address> fetchAddress(String cep) async {
+  int a = int.parse(cep);
   final response =
-      await http.get(Uri.parse('https://viacep.com.br/ws/$cep/json/'));
+      await http.get(Uri.parse('https://viacep.com.br/ws/$a/json/'));
 
   if (response.statusCode == 200) {
+    print(response.statusCode);
     return Address.fromJson(jsonDecode(response.body));
   } else {
     throw Exception('Erro ao consultar');
   }
 }
 
-class Address {
-  final int cep;
-  final String logradouro;
-  final String localidade;
-  final String bairro;
-  final String uf;
-  final int ddd;
+class Address  {
+  final String  cep;
+  final String  logradouro;
+//   final String localidade;
+//   final String bairro;
+//   final String uf;
+//   final String ddd;
 
   const Address({
     required this.cep,
     required this.logradouro,
-    required this.localidade,
-    required this.bairro,
-    required this.uf,
-    required this.ddd,
+//     required this.localidade,
+//     required this.bairro,
+//     required this.uf,
+//     required this.ddd,
   });
+
+  Map<String, dynamic> getData() {
+    return {
+      'Cep': cep,
+      'Logradouro': logradouro
+
+    };
+  }
 
   factory Address.fromJson(Map<String, dynamic> json) {
     return Address(
       cep: json['cep'],
-      logradouro: json['logradouro'],
-      localidade: json['localidade'],
-      bairro: json['bairro'],
-      uf: json['uf'],
-      ddd: json['ddd'],
+      logradouro: json['logradouro']
+//       localidade: json['localidade'],
+//       bairro: json['bairro'],
+//       uf: json['uf'],
+//       ddd: json['ddd'],
     );
   }
 }
@@ -69,23 +80,32 @@ class MyCustomForm extends StatefulWidget {
 class _MyCustomFormState extends State<MyCustomForm> {
   late Future<Address> futureAddress;
   final myController = TextEditingController();
-  int inputCep = 0;
+  String inputCep = '78840000';
 
-  void handleGetCepData(int inputCepValue) {
+  void handleGetCepData(String inputCepValue) {
+    print(inputCepValue.runtimeType);
+
     setState(() {
       inputCep = inputCepValue;
+      print(inputCep.runtimeType);
     });
 
     futureAddress = fetchAddress(inputCep);
+
     // print(futureAddress);
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    futureAddress = fetchAddress(inputCep);
+//   void didChangeDependencies() {
+//     super.didChangeDependencies();
+//     futureAddress = fetchAddress(inputCep);
 
-//     if (inputCep.toString().length > 1) {}
+// //     if (inputCep.toString().length > 1) {}
+//   }
+  @override
+  void initState() {
+    super.initState();
+    futureAddress = fetchAddress(inputCep);
   }
 
   @override
@@ -101,46 +121,51 @@ class _MyCustomFormState extends State<MyCustomForm> {
         title: const Text('Consulta CEP'),
       ),
       body: Column(
-        children: [
+        children: <Widget>[
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
               controller: myController,
               keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              inputFormatters: <TextInputFormatter>[
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
+              ],
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
-                hintText: 'Informe o CEP',
+                labelText: 'CEP',
+                hintText: '78840000',
               ),
             ),
           ),
 //         inputCep != null ? Text('Cep Informado: $inputCep') : const Text(''),
           ElevatedButton(
             onPressed: () {
-              handleGetCepData(int.parse(myController.text));
+              handleGetCepData(myController.text);
             },
-            child: Text('Consultar CEP'),
+            child: const Text('Consultar CEP'),
           ),
-          Padding(
-            padding: const EdgeInsets.all(16),
+          SizedBox(
+            width: 200.0,
+            height: 200.0,
             child: FutureBuilder<Address>(
               future: futureAddress,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return CircularProgressIndicator();
+                  return const CircularProgressIndicator();
                 } else if (snapshot.hasError) {
-                  print(snapshot);
+                  print(snapshot.toString());
                   return Text('Erro: ${snapshot.error}');
                 } else if (snapshot.hasData) {
-                  final data = snapshot.data as Map<String,
-                      dynamic>; // Acesse o mapa de dentro do objeto Address
+                  final  data = snapshot.data!.getData();
+                  print(data);
                   return ListView(
                     children: data.keys.map((key) {
-                      return Text('Chave: $key, Valor: ${data[key]}');
+                      return data[key] == '' ? Text('$key: não informado') : Text('$key: ${data[key]}');
+
                     }).toList(),
                   );
                 } else {
-                  return Text('Nenhuma informação disponível');
+                  return const Text('Nenhuma informação disponível');
                 }
               },
             ),
