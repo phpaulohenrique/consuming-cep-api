@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-// import 'dart:js_interop';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -10,10 +9,9 @@ Future<Address> fetchAddress(String cep) async {
       .get(Uri.parse('https://viacep.com.br/ws/${int.parse(cep)}/json/'));
 
   if (response.statusCode == 200) {
-    print(response.statusCode);
     return Address.fromJson(jsonDecode(response.body));
   } else {
-    throw Exception('Erro ao consultar');
+    throw Exception('Ops, ocorreu um erro ao consultar');
   }
 }
 
@@ -65,47 +63,37 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const MaterialApp(
-      title: 'Consulta endereço por CEP',
-      home: MyCustomForm(),
+      title: 'Consultar endereço pelo CEP',
+      debugShowCheckedModeBanner: false,
+      home: FormCep(),
     );
   }
 }
 
-class MyCustomForm extends StatefulWidget {
-  const MyCustomForm({super.key});
+class FormCep extends StatefulWidget {
+  const FormCep({super.key});
 
   @override
-  State<MyCustomForm> createState() => _MyCustomFormState();
+  State<FormCep> createState() => _FormCepState();
 }
 
-class _MyCustomFormState extends State<MyCustomForm> {
+class _FormCepState extends State<FormCep> {
   late Future<Address> futureAddress;
-  final myController = TextEditingController();
-  String inputCep = '78840000';
+  final inputCepController = TextEditingController();
+  String inputCep = '';
 
   void handleGetCepData(String inputCepValue) {
-//     print(inputCepValue.runtimeType);
-
     setState(() {
       inputCep = inputCepValue;
-      print(inputCep.runtimeType);
     });
 
     if (inputCep == '') {
       return;
+    } else {
+      futureAddress = fetchAddress(inputCep);
     }
-    futureAddress = fetchAddress(inputCep);
-
-    // print(futureAddress);
   }
 
-  @override
-//   void didChangeDependencies() {
-//     super.didChangeDependencies();
-//     futureAddress = fetchAddress(inputCep);
-
-// //     if (inputCep.toString().length > 1) {}
-//   }
   @override
   void initState() {
     super.initState();
@@ -114,7 +102,7 @@ class _MyCustomFormState extends State<MyCustomForm> {
 
   @override
   void dispose() {
-    myController.dispose();
+    inputCepController.dispose();
     super.dispose();
   }
 
@@ -127,7 +115,6 @@ class _MyCustomFormState extends State<MyCustomForm> {
       body: Padding(
         padding: const EdgeInsets.fromLTRB(40, 80, 0, 0),
         child: Column(
-          
           crossAxisAlignment: CrossAxisAlignment.center,
           children: <Widget>[
             SizedBox(
@@ -135,7 +122,7 @@ class _MyCustomFormState extends State<MyCustomForm> {
               child: Padding(
                 padding: const EdgeInsets.all(0),
                 child: TextField(
-                  controller: myController,
+                  controller: inputCepController,
                   keyboardType: TextInputType.number,
                   inputFormatters: <TextInputFormatter>[
                     FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
@@ -151,50 +138,53 @@ class _MyCustomFormState extends State<MyCustomForm> {
             Container(
               margin: const EdgeInsets.fromLTRB(0, 16, 0, 26),
               child: SizedBox(
-                height: 50, //height of button
-                width: 300, //width of button
-      
+                height: 50,
+                width: 300,
                 child: ElevatedButton(
-                  //             style: ElevatedButton.styleFrom(padding: EdgeInsets.all(10)),
                   onPressed: () {
-                    handleGetCepData(myController.text);
+                    handleGetCepData(inputCepController.text);
                   },
-                  child: const Text('Consultar CEP'),
+                  child: const Text('Consultar CEP',
+                      style: TextStyle(fontSize: 16)),
                 ),
               ),
             ),
-            inputCep == ''
-                ? const Text('Informe o CEP.', style: TextStyle(fontSize: 16))
-                : SizedBox(
-                    width: 300.0,
-                    height: 200.0,
-      //             margin: EdgeInsets.only(top: 24),
-                    child: FutureBuilder<Address>(
-                      future: futureAddress,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const CircularProgressIndicator();
-                        } else if (snapshot.hasError) {
-                          print(snapshot.toString());
-                          return Text('Erro: ${snapshot.error}');
-                        } else if (snapshot.hasData) {
-                          final data = snapshot.data!.getData();
-                          print(data);
-                          return ListView(
-                            children: data.keys.map((key) {
-                              return data[key] == ''
-                                  ? Text('$key: não informado',
-                                      style: TextStyle(fontSize: 16))
-                                  : Text('$key: ${data[key]}',
-                                      style: TextStyle(fontSize: 16));
-                            }).toList(),
-                          );
-                        } else {
-                          return const Text('Nenhuma informação disponível');
-                        }
-                      },
-                    ),
-                  ),
+            inputCep.isEmpty
+                ? const Text('Informe o CEP', style: TextStyle(fontSize: 16))
+                : inputCep.length >= 1 && inputCep.length != 8
+                    ? const Text('CEP Inválido',
+                        style: TextStyle(fontSize: 16, color: Colors.red))
+                    : SizedBox(
+                        width: 300.0,
+                        height: 200.0,
+                        child: FutureBuilder<Address>(
+                          future: futureAddress,
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const CircularProgressIndicator();
+                            } else if (snapshot.hasError) {
+                              return Text(
+                                  'Ocorreu um erro, verifique se o CEP informado está correto. Erro: ${snapshot.error}');
+                            } else if (snapshot.hasData) {
+                              final data = snapshot.data!.getData();
+
+                              return ListView(
+                                children: data.keys.map((key) {
+                                  return data[key] == ''
+                                      ? Text('$key: não informado',
+                                          style: const TextStyle(fontSize: 16))
+                                      : Text('$key: ${data[key]}',
+                                          style: const TextStyle(fontSize: 16));
+                                }).toList(),
+                              );
+                            } else {
+                              return const Text(
+                                  'Nenhuma informação disponível');
+                            }
+                          },
+                        ),
+                      ),
           ],
         ),
       ),
